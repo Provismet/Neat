@@ -10,11 +10,13 @@
     "williewillus",
     "Alwinfy"
   ],
+  "contributors": [
+    "Provismet"
+  ],
+
   "contact": {
-    "irc": "ircs://irc.esper.net:6697/vazkii",
-    "email": "~williewillus/violet-moon@lists.sr.ht",
-    "sources": "https://github.com/VazkiiMods/Neat",
-    "issues": "https://github.com/VazkiiMods/Neat/issues"
+    "sources": "https://github.com/Provismet/Neat",
+    "issues": "https://github.com/Provismet/Neat/issues"
   },
 
   "license": "MIT AND CC-BY-NC-SA-3.0",

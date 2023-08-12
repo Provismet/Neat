@@ -13,11 +13,6 @@ subprojects {
 
     repositories {
         mavenCentral()
-
-        maven {
-            name = 'Sponge / Mixin'
-            url = 'https://repo.spongepowered.org/repository/maven-public/'
-        }
     }
 
     tasks.withType(JavaCompile).configureEach {
@@ -29,10 +24,14 @@ subprojects {
         it.enabled = false
     }
 
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+
     pmd {
         toolVersion '6.35.0'
         incrementalAnalysis.set(true)
-        ruleSets.clear()
         ruleSetFiles = rootProject.files("spotless/pmd-ruleset.xml")
     }
 

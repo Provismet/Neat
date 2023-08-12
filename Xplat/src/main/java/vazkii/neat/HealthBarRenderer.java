@@ -10,8 +10,12 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.monster.Monster;
@@ -124,9 +128,14 @@ public class HealthBarRenderer {
 		}
 	}
 
+	private static final TagKey<EntityType<?>> FORGE_BOSS_TAG =
+			TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation("forge", "bosses"));
+
+	private static final TagKey<EntityType<?>> FABRIC_BOSS_TAG =
+			TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation("c", "bosses"));
+
 	private static boolean isBoss(Entity entity) {
-		// TODO inaccurate
-		return !entity.canChangeDimensions();
+		return entity.getType().is(FORGE_BOSS_TAG) || entity.getType().is(FABRIC_BOSS_TAG);
 	}
 
 	private static boolean shouldShowPlate(Entity entity, Entity cameraEntity) {
@@ -164,17 +173,30 @@ public class HealthBarRenderer {
 
 		return true;
 	}
+	public static float[] getVehicleHealthRecursive (LivingEntity living) {
+		float[] health = new float[] {0f, 0f};
+		
+		Entity currentEntity = living.getVehicle();
+		while (currentEntity != null) {
+			if (currentEntity instanceof LivingEntity currentLiving) {
+				health[0] += currentLiving.getHealth();
+				health[1] += currentLiving.getMaxHealth();
+			}
+			currentEntity = currentEntity.getVehicle();
+		}
+
+		return health;
+	}
 
 	public static void hookRender(Entity entity, PoseStack poseStack, MultiBufferSource buffers,
 			Quaternionf cameraOrientation) {
 		final Minecraft mc = Minecraft.getInstance();
 
-		if (!(entity instanceof LivingEntity living) || !entity.getPassengers().isEmpty()) {
-			// TODO handle mob stacks properly
+		if (!(entity instanceof LivingEntity living) || (!living.getPassengers().isEmpty() && living.getPassengers().get(0) instanceof LivingEntity)) {
 			return;
 		}
 
-		if (!shouldShowPlate(entity, mc.gameRenderer.getMainCamera().getEntity())) {
+		if (!shouldShowPlate(living, mc.gameRenderer.getMainCamera().getEntity())) {
 			return;
 		}
 
@@ -183,15 +205,15 @@ public class HealthBarRenderer {
 		final float globalScale = 0.0267F;
 		final float textScale = 0.5F;
 		final int barHeight = NeatConfig.instance.barHeight();
-		final boolean boss = isBoss(entity);
-		final String name = entity.hasCustomName()
-				? ChatFormatting.ITALIC + entity.getCustomName().getString()
-				: entity.getDisplayName().getString();
+		final boolean boss = isBoss(living);
+		final String name = living.hasCustomName()
+				? ChatFormatting.ITALIC + living.getCustomName().getString()
+				: living.getDisplayName().getString();
 		final float nameLen = mc.font.width(name) * textScale;
 		final float halfSize = Math.max(NeatConfig.instance.plateSize(), nameLen / 2.0F + 10.0F);
 
 		poseStack.pushPose();
-		poseStack.translate(0, entity.getBbHeight() + NeatConfig.instance.heightAbove(), 0);
+		poseStack.translate(0, living.getBbHeight() + NeatConfig.instance.heightAbove(), 0);
 		poseStack.mulPose(cameraOrientation);
 
 		// Plate background, bars, and text operate with globalScale, but icons don't
@@ -251,6 +273,8 @@ public class HealthBarRenderer {
 
 			// Health values (and debug ID)
 			{
+				float[] vehicleHealthValues = getVehicleHealthRecursive(living);
+
 				final float healthValueTextScale = 0.75F * textScale;
 				poseStack.pushPose();
 				poseStack.translate(-halfSize, -4.5F, 0F);
@@ -259,11 +283,11 @@ public class HealthBarRenderer {
 				int h = NeatConfig.instance.hpTextHeight();
 
 				if (NeatConfig.instance.showCurrentHP()) {
-					String hpStr = HEALTH_FORMAT.format(living.getHealth());
+					String hpStr = vehicleHealthValues[0] > 0 ? HEALTH_FORMAT.format(living.getHealth()) + "+" + HEALTH_FORMAT.format(vehicleHealthValues[0]) : HEALTH_FORMAT.format(living.getHealth());
 					mc.font.drawInBatch(hpStr, 2, h, white, false, poseStack.last().pose(), buffers, Font.DisplayMode.NORMAL, black, light);
 				}
 				if (NeatConfig.instance.showMaxHP()) {
-					String maxHpStr = ChatFormatting.BOLD + HEALTH_FORMAT.format(living.getMaxHealth());
+					String maxHpStr = vehicleHealthValues[1] > 0 ? ChatFormatting.BOLD + HEALTH_FORMAT.format(living.getMaxHealth()) + "+" + HEALTH_FORMAT.format(vehicleHealthValues[1]) : ChatFormatting.BOLD + HEALTH_FORMAT.format(living.getMaxHealth());
 					mc.font.drawInBatch(maxHpStr, (int) (halfSize / healthValueTextScale * 2) - mc.font.width(maxHpStr) - 2, h, white, false, poseStack.last().pose(), buffers, Font.DisplayMode.NORMAL, black, light);
 				}
 				if (NeatConfig.instance.showPercentage()) {
@@ -271,7 +295,7 @@ public class HealthBarRenderer {
 					mc.font.drawInBatch(percStr, (int) (halfSize / healthValueTextScale) - mc.font.width(percStr) / 2.0F, h, white, false, poseStack.last().pose(), buffers, Font.DisplayMode.NORMAL, black, light);
 				}
 				if (NeatConfig.instance.enableDebugInfo() && mc.options.renderDebug) {
-					var id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+					var id = BuiltInRegistries.ENTITY_TYPE.getKey(living.getType());
 					mc.font.drawInBatch("ID: \"" + id + "\"", 0, h + 16, white, false, poseStack.last().pose(), buffers, Font.DisplayMode.NORMAL, black, light);
 				}
 				poseStack.popPose();
